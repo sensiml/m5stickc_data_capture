@@ -1,27 +1,17 @@
-#include "wifi_config.h"
-#include "sensor_config.h"
 #include <M5StickC.h>
 #include <WiFi.h>
-
+#include <ArduinoJson.h>
+#include "sensor_config.h"
+#include "wifi_config.h"
+#include "logo.h"
 // Replace with your network credentials
 const char* ssid     = WIFI_SSID;
 const char* password = WIFI_PASS;
 
-const char* json_config = "{"
-                          "\"sample_rate\":200,"
-                          "\"samples_per_packet\":10,"
-                          "\"column_location\":{"
-                          "  \"AccelerometerX\":0,"
-                          "  \"AccelerometerY\":1,"
-                          "  \"AccelerometerZ\":2,"
-                          "  \"GyroscopeX\":3,"
-                          "  \"GyroscopeY\":4,"
-                          "  \"GyroscopeZ\":5"
-                          "}"
-                          "}\r\n";
+WiFiServer server(WIFI_SERVER_PORT);
 
-// Set web server port number to 80
-WiFiServer server(80);
+DynamicJsonDocument config_message(WRITE_BUFFER_SIZE);
+static char         config_output_str[WRITE_BUFFER_SIZE];
 
 // Variable to store the HTTP request
 String  header;
@@ -59,32 +49,69 @@ static void get_sawtooth(int16_t* ax, int16_t* ay, int16_t* az, int16_t sign)
 }
 #endif
 
+static void clear_screen(void)
+{
+    M5.Lcd.fillScreen(BLACK);
+    M5.Lcd.setCursor(0, 0);
+}
+
+static void set_stream_idle_lcd(void)
+{
+    clear_screen();
+    M5.Lcd.println(WiFi.localIP());
+    M5.Lcd.println("Stream Idle");
+}
+
+static void set_stream_active_lcd(void)
+{
+    clear_screen();
+    M5.Lcd.println(WiFi.localIP());
+    M5.Lcd.println("Streaming");
+}
+
+
+
+static void build_config_message()
+{
+    int column_index                     = 0;
+    config_message["sample_rate"]        = SENSOR_SAMPLE_RATE;
+    config_message["samples_per_packet"] = SAMPLES_PER_PACKET;
+#if ENABLE_ACCEL
+    config_message["column_location"]["AccelerometerX"] = column_index++;
+    config_message["column_location"]["AccelerometerY"] = column_index++;
+    config_message["column_location"]["AccelerometerZ"] = column_index++;
+#endif
+#if ENABLE_GYRO
+    config_message["column_location"]["GyroscopeX"] = column_index++;
+    config_message["column_location"]["GyroscopeY"] = column_index++;
+    config_message["column_location"]["GyroscopeZ"] = column_index++;
+#endif
+#if ENABLE_AUDIO
+    config_message["column_location"]["Microphone"] = column_index++;
+#endif
+}
+
+
 void setup()
 {
     // put your setup code here, to run once:
     M5.begin();
     M5.IMU.Init();
     M5.Lcd.setRotation(3);
-    M5.Lcd.fillScreen(BLACK);
-    M5.Lcd.setTextSize(1);
-    M5.Lcd.setCursor(0, 0);
-
+    clear_screen();
+    M5.Lcd.drawBitmap(6,5,sensiml_logoWidth, sensiml_logoHeight, sensiml_logo);
+    M5.Lcd.setTextSize(2);
     Serial.begin(115200);
+    build_config_message();
+    serializeJson(config_message, config_output_str, WRITE_BUFFER_SIZE);
 
     // Connect to Wi-Fi network with SSID and password
-    Serial.print("Connecting to ");
-    Serial.println(ssid);
     WiFi.begin(ssid, password);
-    M5.Lcd.println("Attempting WiFi Connection");
     while (WiFi.status() != WL_CONNECTED)
     {
         delay(500);
-        M5.Lcd.print(".");
     }
-    M5.Lcd.fillScreen(BLACK);
-    M5.Lcd.setCursor(0, 0);
-    // Print local IP address and start web server
-    M5.Lcd.println(WiFi.localIP());
+    set_stream_idle_lcd();
     server.begin();
 }
 
@@ -137,13 +164,14 @@ void loop()
                             client.println("HTTP/1.1 200 OK");
                             client.println("Content-type:text/json");
                             client.println();
-                            client.println(json_config);
+                            client.println(config_output_str);
 
                             // Break out of the while loop
                             break;
                         }
                         else if (header.indexOf("GET /stream") >= 0)
                         {
+                            set_stream_active_lcd();
                             client.println("HTTP/1.1 200 OK");
                             client.println("Content-type:application/octet-stream");
                             client.println();
@@ -172,6 +200,7 @@ void loop()
                                     pIndex = 0;
                                 }
                             }
+                            set_stream_idle_lcd();
                         }
 
                         // The HTTP response ends with another blank line
@@ -192,12 +221,10 @@ void loop()
         header = "";
         // Close the connection
         client.stop();
-        // M5.Lcd.fillScreen(BLACK);
-        // M5.Lcd.setCursor(0, 0);
-        // // Print local IP address and start web server
-        // M5.Lcd.println(WiFi.localIP());
-        // M5.Lcd.println("Disconnected");
         Serial.println("Client disconnected.");
         Serial.println("");
+    }
+    else
+    {
     }
 }

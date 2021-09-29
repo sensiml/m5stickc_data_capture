@@ -8,7 +8,15 @@
 
 #define ENABLE_ACCEL 1
 #define ENABLE_GYRO 1
+
 #define USE_SAWTOOTH_PATTERN 0
+
+#if ENABLE_ACCEL || ENABLE_GYRO
+#define SENSOR_SAMPLE_RATE 200
+#else
+#define SENSOR_SAMPLE_RATE 16000
+#endif
+
 
 #if ENABLE_ACCEL && ENABLE_GYRO
 #define SAMPLES_PER_PACKET 10
@@ -24,6 +32,6 @@
 
 
 
-const int WRITE_BUFFER_SIZE = 256;
+const int WRITE_BUFFER_SIZE = 512;
 
 #endif //__SENSOR_CONFIG_H__
