@@ -8,6 +8,26 @@
 const char* ssid     = WIFI_SSID;
 const char* password = WIFI_PASS;
 
+#if ENABLE_AUDIO
+#include <driver/i2s.h>
+/* ----- i2s hardware constants ----- */
+const i2s_port_t kI2S_Port = I2S_NUM_0;
+const int kI2S_PinClk = 0;
+const int kI2S_PinData = 34;
+/* ----- i2s constants ----- */
+const i2s_bits_per_sample_t audio_bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT;
+const uint8_t kI2S_BytesPerSample = audio_bits_per_sample / 8;
+const uint16_t kI2S_ReadSizeBytes = SAMPLES_PER_PACKET * kI2S_BytesPerSample;
+const uint16_t kI2S_BufferSizeSamples = 1024;
+const uint16_t kI2S_BufferSizeBytes = kI2S_BufferSizeSamples * kI2S_BytesPerSample;
+const uint16_t kI2S_BufferCount = (3 * SAMPLES_PER_PACKET) / (2 * kI2S_BufferSizeSamples);
+const int kI2S_QueueLength = 16;
+/* ----- i2s variables ----- */
+int16_t micReadBuffer_[SAMPLES_PER_PACKET] = {0};
+
+QueueHandle_t pI2S_Queue_ = nullptr;
+#endif //ENABLE_AUDIO
+
 WiFiServer server(WIFI_SERVER_PORT);
 
 DynamicJsonDocument config_message(WRITE_BUFFER_SIZE);
@@ -25,10 +45,11 @@ unsigned long previousTime = 0;
 // Define timeout time in milliseconds (example: 2000ms = 2s)
 const long timeoutTime = 20000;
 
+
+/* IMU Variables */
 int16_t accX = 0;
 int16_t accY = 0;
 int16_t accZ = 0;
-
 int16_t gyroX = 0;
 int16_t gyroY = 0;
 int16_t gyroZ = 0;
@@ -49,6 +70,83 @@ static void get_sawtooth(int16_t* ax, int16_t* ay, int16_t* az, int16_t sign)
 }
 #endif
 
+static size_t get_audio_data()
+{
+    esp_err_t i2sErr = ESP_OK;
+
+    size_t i2sBytesRead = 0;
+
+    // Store time stamp for debug output
+    unsigned long timeBeforeReadMicros = micros();
+
+    // Note: If the I2S DMA buffer is empty, 'i2s_read' blocks the current thread until data becomes available
+    i2sErr = i2s_read(kI2S_Port, micReadBuffer_, kI2S_ReadSizeBytes, &i2sBytesRead, 100 / portTICK_PERIOD_MS);
+    // Check i2s error state after reading
+    if (i2sErr)
+    {
+        log_e("i2s_read failure. ESP error: %s (%x)", esp_err_to_name(i2sErr), i2sErr);
+    }
+
+    return i2sBytesRead;
+}
+
+bool setupI2Smic()
+{
+    esp_err_t i2sErr;
+
+    // i2s configuration for sampling 16 bit mono audio data
+    //
+    // Notes related to i2s.c:
+    // - 'dma_buf_len', i.e. the number of samples in each DMA buffer, is limited to 1024
+    // - 'dma_buf_len' * 'bytes_per_sample' is limted to 4092
+    // - 'I2S_CHANNEL_FMT_ONLY_RIGHT' means "mono", i.e. only one channel to be received via i2s
+    //   In the M5StickC microphone example 'I2S_CHANNEL_FMT_ALL_RIGHT' is used which means two channels.
+    //   Afterwards, i2s_set_clk is called to change the DMA configuration to just one channel.
+    //
+    i2s_config_t i2sConfig = {
+        .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX | I2S_MODE_PDM),
+        .sample_rate = SENSOR_SAMPLE_RATE,
+        .bits_per_sample = audio_bits_per_sample,
+        .channel_format = I2S_CHANNEL_FMT_ONLY_RIGHT,
+        .communication_format = I2S_COMM_FORMAT_I2S,
+        .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
+        .dma_buf_count = kI2S_BufferCount,
+        .dma_buf_len = kI2S_BufferSizeSamples
+    };
+
+    i2sErr = i2s_driver_install(kI2S_Port, &i2sConfig, kI2S_QueueLength, &pI2S_Queue_);
+
+    if (i2sErr)
+    {
+        Serial.println("Failed to start i2s driver. ESP error");//: %s (%x)", esp_err_to_name(i2sErr), i2sErr);
+        return false;
+    }
+
+    if (pI2S_Queue_ == nullptr)
+    {
+        Serial.println("Failed to setup i2s event queue.");
+        return false;
+    }
+
+    // Configure i2s pins for sampling audio data from the built-in microphone of the M5StickC
+    i2s_pin_config_t i2sPinConfig = {
+        .bck_io_num = I2S_PIN_NO_CHANGE,
+        .ws_io_num = kI2S_PinClk,
+        .data_out_num = I2S_PIN_NO_CHANGE,
+        .data_in_num = kI2S_PinData
+    };
+
+    i2sErr = i2s_set_pin(kI2S_Port, &i2sPinConfig);
+
+    if (i2sErr)
+    {
+        log_e("Failed to set i2s pins. ESP error: %s (%x)", esp_err_to_name(i2sErr), i2sErr);
+        return false;
+    }
+
+    return true;
+}
+
 static void clear_screen(void)
 {
     M5.Lcd.fillScreen(BLACK);
@@ -59,6 +157,7 @@ static void set_stream_idle_lcd(void)
 {
     clear_screen();
     M5.Lcd.println(WiFi.localIP());
+    M5.Lcd.println("");
     M5.Lcd.println("Stream Idle");
 }
 
@@ -66,10 +165,9 @@ static void set_stream_active_lcd(void)
 {
     clear_screen();
     M5.Lcd.println(WiFi.localIP());
+    M5.Lcd.println("");
     M5.Lcd.println("Streaming");
 }
-
-
 
 static void build_config_message()
 {
@@ -96,7 +194,12 @@ void setup()
 {
     // put your setup code here, to run once:
     M5.begin();
+#if ENABLE_ACCEL || ENABLE_GYRO
     M5.IMU.Init();
+#endif
+#if ENABLE_AUDIO
+    setupI2Smic();
+#endif
     M5.Lcd.setRotation(3);
     clear_screen();
     M5.Lcd.drawBitmap(6,5,sensiml_logoWidth, sensiml_logoHeight, sensiml_logo);
@@ -180,10 +283,6 @@ void loop()
                             {
 #if (ENABLE_ACCEL || ENABLE_GYRO)
                                 get_imu_data(pData, &pIndex);
-#elif ENABLE_AUDIO
-                                get_audio_data();
-#endif
-
                                 delay(5);
 
                                 pData[pIndex++] = accX;
@@ -199,6 +298,12 @@ void loop()
                                     // Serial.println(bytesRead);
                                     pIndex = 0;
                                 }
+#elif ENABLE_AUDIO
+                                get_audio_data();
+                                client.write((uint8_t*)micReadBuffer_, kI2S_ReadSizeBytes/2);
+#endif
+
+                                
                             }
                             set_stream_idle_lcd();
                         }
@@ -224,7 +329,5 @@ void loop()
         Serial.println("Client disconnected.");
         Serial.println("");
     }
-    else
-    {
-    }
+    
 }
