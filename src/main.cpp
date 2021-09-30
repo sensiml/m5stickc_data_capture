@@ -18,7 +18,7 @@ const int kI2S_PinData = 34;
 const i2s_bits_per_sample_t audio_bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT;
 const uint8_t kI2S_BytesPerSample = audio_bits_per_sample / 8;
 const uint16_t kI2S_ReadSizeBytes = SAMPLES_PER_PACKET * kI2S_BytesPerSample;
-const uint16_t kI2S_BufferSizeSamples = 1024;
+const uint16_t kI2S_BufferSizeSamples = SAMPLES_PER_PACKET/kI2S_BytesPerSample;
 const uint16_t kI2S_BufferSizeBytes = kI2S_BufferSizeSamples * kI2S_BytesPerSample;
 const uint16_t kI2S_BufferCount = (3 * SAMPLES_PER_PACKET) / (2 * kI2S_BufferSizeSamples);
 const int kI2S_QueueLength = 16;
@@ -70,6 +70,7 @@ static void get_sawtooth(int16_t* ax, int16_t* ay, int16_t* az, int16_t sign)
 }
 #endif
 
+#if ENABLE_AUDIO
 static size_t get_audio_data()
 {
     esp_err_t i2sErr = ESP_OK;
@@ -146,6 +147,7 @@ bool setupI2Smic()
 
     return true;
 }
+#endif //ENABLE_AUDIO
 
 static void clear_screen(void)
 {
@@ -283,7 +285,7 @@ void loop()
                             {
 #if (ENABLE_ACCEL || ENABLE_GYRO)
                                 get_imu_data(pData, &pIndex);
-                                delay(5);
+                                delay(1000/SENSOR_SAMPLE_RATE);
 
                                 pData[pIndex++] = accX;
                                 pData[pIndex++] = accY;
@@ -300,7 +302,7 @@ void loop()
                                 }
 #elif ENABLE_AUDIO
                                 get_audio_data();
-                                client.write((uint8_t*)micReadBuffer_, kI2S_ReadSizeBytes/2);
+                                client.write((uint8_t*)micReadBuffer_, kI2S_ReadSizeBytes);
 #endif
 
                                 
