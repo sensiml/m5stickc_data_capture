@@ -2,8 +2,6 @@
 #define __SENSOR_CONFIG_H__
 #include <ArduinoJson.h>
 
-
-
 #define ENABLE_AUDIO 0
 
 #define ENABLE_ACCEL 1
