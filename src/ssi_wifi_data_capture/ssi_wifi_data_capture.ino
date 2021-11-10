@@ -10,7 +10,7 @@ const char* password = "";
 
 const char* json_config = \
 "{"\
-   "\"sample_rate\":1000,"\
+   "\"sample_rate\":100,"\
    "\"samples_per_packet\":10,"\
    "\"column_location\":{"\
   "  \"AccelerometerX\":0,"
@@ -28,7 +28,7 @@ WiFiServer server(80);
 // Variable to store the HTTP request
 String header;
 int bytesRead = 0;
-int16_t timer;
+int16_t timer=0;
 
 // Current time
 unsigned long currentTime = millis();
@@ -52,7 +52,7 @@ int16_t pData[PACKET_SIZE];
 void setup() {
 
   // put your setup code here, to run once:
-  M5.begin();
+  M5.begin();  
   M5.IMU.Init();
   M5.Lcd.setRotation(3);
   M5.Lcd.fillScreen(BLACK);
@@ -129,11 +129,14 @@ void loop(){
                 int pIndex=0;
                 while (client.connected()){
 		  // Test with sawtooth pattern
+
+                  pIndex=0;
+                  for (int i=0; i< SAMPLES_PER_PACKET; i++){
+                  
+                  M5.IMU.getGyroAdc(&gyroX,&gyroY,&gyroZ);
+                  M5.IMU.getAccelAdc(&accX,&accY,&accZ);
                   //get_sawtooth(&gyroX,&gyroY,&gyroZ,(int16_t)-1);
                   //get_sawtooth(&accX,&accY,&accZ,(int16_t)1);
-                  M5.IMU.getAccelAdc(&accX,&accY,&accZ);
-                  M5.IMU.getGyroAdc(&gyroX,&gyroY,&gyroZ);
-                  delay(10);
 
                   pData[pIndex++] = accX;
                   pData[pIndex++] = accY;
@@ -141,15 +144,17 @@ void loop(){
                   pData[pIndex++] = gyroX;
                   pData[pIndex++] = gyroY;
                   pData[pIndex++] = gyroZ;
-
-                  if (pIndex == PACKET_SIZE)
-                  {
-                      bytesRead = client.write((const char*) pData, PACKET_SIZE*2);
-                      //Serial.println(bytesRead);
-                      pIndex = 0;
+                    
+                  delay(10);
                   }
+                  
 
-            }
+          
+                  M5.Lcd.setCursor(0, 30);
+                  M5.Lcd.printf(" %d %d %d  ", accX, accY, accZ);       
+                  bytesRead = client.write((const char*) pData, PACKET_SIZE*2);
+                  
+                }
             }
 
             // The HTTP response ends with another blank line
