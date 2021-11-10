@@ -1,0 +1,70 @@
+{
+    "uuid": "1de28820-dfbc-4841-8699-eb354724c2b0",
+    "device_name": "m5 Stick",
+    "device_manufacturer": " M5STACK",
+    "plugin_developer": "SensiML",
+    "firmware_download_links": [
+        {
+            "title": "Data Collection Firmware",
+            "description": "",
+            "link": "https://sensiml.com/documentation/firmware/"
+        }
+    ],
+    "documentation_links": [
+        {
+            "title": "Getting Started Guide",
+            "description": "",
+            "link": "https://sensiml.com/documentation/guides/getting-started/overview.html"
+        }
+    ],
+    "collection_methods": [
+        {
+            "name": "live",
+            "display_name": "Live Stream Capture",
+            "is_default": true
+        }
+    ],
+    "device_connections": [
+        {
+            "display_name": "WiFi",
+            "value": 2,
+            "is_default": true,
+            "wifi_configuration": {
+                "max_live_sample_rate": 400
+            }
+        }
+    ],
+    "capture_sources": [
+        {
+            "name": "Motion",
+            "part": "Default",
+            "sample_rates": [
+                100,
+            ],
+            "is_default": true,
+            "sensors": [
+                {
+                    "type": "Accelerometer",
+                    "is_default": true,
+                    "column_count": 3,
+                    "column_suffixes": [
+                        "X",
+                        "Y",
+                        "Z"
+                    ]
+                },
+                {
+                    "type": "Gyroscope",
+                    "is_default": true,
+                    "column_count": 3,
+                    "column_suffixes": [
+                        "X",
+                        "Y",
+                        "Z"
+                    ]
+                },
+            
+            ]
+        }
+    ]
+}
