@@ -1,0 +1,80 @@
+{
+    "uuid": "1de28820-dfbc-4841-8699-eb354724c2b0",
+    "device_name": "M5 Stick-Cplus",
+    "device_manufacturer": " M5STACK",
+    "plugin_developer": "SensiML",
+    "firmware_download_links": [
+        {
+            "title": "Data Collection Firmware",
+            "description": "IMU Data Collection firmware",
+            "link": "https://github.com/sensiml/m5stickc_data_capture"
+        }
+    ],
+    "documentation_links": [
+        {
+            "title": "Getting Started Guide",
+            "description": "",
+            "link": "https://sensiml.com/documentation/guides/getting-started/overview.html"
+        }
+    ],
+    "device_connections": [
+        {
+            "display_name": "WiFi",
+            "value": 2,
+            "is_default": true
+        }
+    ],
+    "capture_sources": [
+        {
+            "name": "Motion",
+            "part": "Default",
+            "sample_rates": [
+                100
+            ],
+            "is_default": true,
+            "sensors": [
+                {
+                    "type": "S_0_L_Accelerometer",
+                    "is_default": true,
+                    "column_count": 3,
+                    "column_suffixes": [
+                        "X",
+                        "Y",
+                        "Z"
+                    ]
+                },
+                {
+                    "type": "S_0_L_Gyroscope",
+                    "is_default": true,
+                    "column_count": 3,
+                    "column_suffixes": [
+                        "X",
+                        "Y",
+                        "Z"
+                    ]
+                }, 
+                {
+                    "type": "S_1_R_Accelerometer",
+                    "is_default": true,
+                    "column_count": 3,
+                    "column_suffixes": [
+                        "X",
+                        "Y",
+                        "Z"
+                    ]
+                },
+                {
+                    "type": "S_1_R_Gyroscope",
+                    "is_default": true,
+                    "column_count": 3,
+                    "column_suffixes": [
+                        "X",
+                        "Y",
+                        "Z"
+                    ]
+                }
+            ]
+        }
+    ],
+    "is_little_endian": true
+}
